@@ -16,6 +16,10 @@ defmodule Clothes do
   """
   def new(), do: %Clothes{}
 
+  def new(entries \\ []) do
+    Enum.reduce(entries, %Clothes{}, &add_item(&2, &1))
+  end
+
   def add_item(items, item) do
     item = Map.put(item, :id, items.auto_id)
     new_clothing = Map.put(items.clothing, items.auto_id, item)
@@ -58,4 +62,17 @@ defmodule Clothes do
 
     %Clothes{items | clothing: new_clothing}
   end
+end
+
+defimpl Collectable, for: Clothes do
+  def into(original) do
+    {original, &into_callback/2}
+  end
+
+  defp into_callback(clothing, {:cont, item}) do
+    Clothes.add_item(clothing, item)
+  end
+
+  defp into_callback(clothing, :done), do: clothing
+  defp into_callback(clothing, :halt), do: :ok
 end
