@@ -10,8 +10,8 @@ defmodule Clothes do
 
   ## Examples
 
-      iex> Clothes.hello()
-      :world
+      iex> Clothes.new()
+      %Clothes{}
 
   """
   def new(), do: %Clothes{}

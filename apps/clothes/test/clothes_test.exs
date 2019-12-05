@@ -3,6 +3,6 @@ defmodule ClothesTest do
   doctest Clothes
 
   test "greets the world" do
-    assert Clothes.hello() == :world
+    assert Clothes.new() == %Clothes{}
   end
 end
