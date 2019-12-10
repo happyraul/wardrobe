@@ -32,7 +32,7 @@ defmodule Clothes.Server do
   @impl GenServer
   def init(user_id) do
     send(self(), :real_init)
-    {:ok, {user_id, nil}
+    {:ok, {user_id, nil}}
   end
 
   @impl GenServer
@@ -49,17 +49,23 @@ defmodule Clothes.Server do
 
   @impl GenServer
   def handle_cast({:update_item, item_id, updater_fun}, {user_id, items}) do
-    {:noreply, {user_id, Clothes.update_item(items, item_id, updater_fun)}}
+    new_clothes = Clothes.update_item(items, item_id, updater_fun)
+    Clothes.Database.store(user_id, new_clothes)
+    {:noreply, {user_id, new_clothes}}
   end
 
   @impl GenServer
   def handle_cast({:update_item, new_item}, {user_id, items}) do
-    {:noreply, {user_id, Clothes.update_item(items, new_item)}}
+    new_clothes = Clothes.update_item(items, new_item)
+    Clothes.Database.store(user_id, new_clothes)
+    {:noreply, {user_id, new_clothes}}
   end
 
   @impl GenServer
   def handle_cast({:delete_item, item_id}, {user_id, items}) do
-    {:noreply, {user_id, Clothes.delete_item(items, item_id)}}
+    new_clothes = Clothes.delete_item(items, item_id)
+    Clothes.Database.store(user_id, new_clothes)
+    {:noreply, {user_id, new_clothes}}
   end
 
   @impl GenServer
