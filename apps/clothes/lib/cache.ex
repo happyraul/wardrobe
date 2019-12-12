@@ -19,7 +19,12 @@ defmodule Clothes.Cache do
   def handle_call({:server_process, user_id}, _, clothes_servers) do
     case Map.fetch(clothes_servers, user_id) do
       {:ok, clothes_server} ->
-        {:reply, clothes_server, clothes_servers}
+        if Process.alive?(clothes_server) do
+          {:reply, clothes_server, clothes_servers}
+        else
+          {:ok, new_server} = Clothes.Server.start(user_id)
+          {:reply, new_server, Map.put(clothes_servers, user_id, new_server)}
+        end
 
       :error ->
         {:ok, new_server} = Clothes.Server.start(user_id)
