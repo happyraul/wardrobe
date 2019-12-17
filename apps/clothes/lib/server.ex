@@ -1,8 +1,8 @@
 defmodule Clothes.Server do
   use GenServer
 
-  def start(user_id) do
-    GenServer.start(Clothes.Server, user_id)
+  def start_link(user_id) do
+    GenServer.start_link(Clothes.Server, user_id)
   end
 
   def add_item(pid, new_item) do

@@ -3,8 +3,9 @@ defmodule Clothes.Database do
 
   @db_folder "./persist"
 
-  def start do
-    GenServer.start(__MODULE__, nil, name: __MODULE__)
+  def start_link(_) do
+    IO.puts("Starting database server.")
+    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
   def store(key, data) do
@@ -29,7 +30,7 @@ defmodule Clothes.Database do
 
     workers =
       Enum.reduce(0..2, %{}, fn id, acc ->
-        {:ok, pid} = Clothes.DatabaseWorker.start(@db_folder)
+        {:ok, pid} = Clothes.DatabaseWorker.start_link(@db_folder)
         Map.put(acc, id, pid)
       end)
 
