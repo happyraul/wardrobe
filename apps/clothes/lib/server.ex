@@ -1,8 +1,13 @@
 defmodule Clothes.Server do
-  use GenServer
+  use GenServer, restart: :temporary
 
   def start_link(user_id) do
-    GenServer.start_link(Clothes.Server, user_id)
+    IO.puts("Starting clothes server for #{user_id}")
+    GenServer.start_link(Clothes.Server, user_id, name: via_tuple(user_id))
+  end
+
+  defp via_tuple(user_id) do
+    Clothes.ProcessRegistry.via_tuple({__MODULE__, user_id})
   end
 
   def add_item(pid, new_item) do

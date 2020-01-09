@@ -1,34 +1,32 @@
 defmodule Clothes.Cache do
-  use GenServer
+  def start_link() do
+    IO.puts("Starting clothes cache")
 
-  def start_link(_) do
-    IO.puts("Starting clothes cache.")
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+    DynamicSupervisor.start_link(
+      name: __MODULE__,
+      strategy: :one_for_one
+    )
   end
 
   def server_process(user_id) do
-    GenServer.call(__MODULE__, {:server_process, user_id})
-  end
-
-  @impl GenServer
-  def init(_) do
-    {:ok, %{}}
-  end
-
-  @impl GenServer
-  def handle_call({:server_process, user_id}, _, clothes_servers) do
-    case Map.fetch(clothes_servers, user_id) do
-      {:ok, clothes_server} ->
-        if Process.alive?(clothes_server) do
-          {:reply, clothes_server, clothes_servers}
-        else
-          {:ok, new_server} = Clothes.Server.start_link(user_id)
-          {:reply, new_server, Map.put(clothes_servers, user_id, new_server)}
-        end
-
-      :error ->
-        {:ok, new_server} = Clothes.Server.start_link(user_id)
-        {:reply, new_server, Map.put(clothes_servers, user_id, new_server)}
+    case start_child(user_id) do
+      {:ok, pid} -> pid
+      {:error, {:already_started, pid}} -> pid
     end
+  end
+
+  defp start_child(user_id) do
+    DynamicSupervisor.start_child(
+      __MODULE__,
+      {Clothes.Server, user_id}
+    )
+  end
+
+  def child_spec(_) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, []},
+      type: :supervisor
+    }
   end
 end
