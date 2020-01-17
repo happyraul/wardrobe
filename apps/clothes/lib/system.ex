@@ -4,7 +4,8 @@ defmodule Clothes.System do
       [
         Clothes.ProcessRegistry,
         Clothes.Database,
-        Clothes.Cache
+        Clothes.Cache,
+        Clothes.Metrics
       ],
       strategy: :one_for_one
     )

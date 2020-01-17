@@ -34,52 +34,61 @@ defmodule Clothes.Server do
     GenServer.cast(pid, {:delete_item, item_id})
   end
 
+  @expiry_idle_timeout :timer.seconds(10)
+
   @impl GenServer
   def init(user_id) do
     send(self(), :real_init)
-    {:ok, {user_id, nil}}
+    {:ok, {user_id, nil}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_info(:real_init, {user_id, _}) do
-    {:noreply, {user_id, Clothes.Database.get(user_id) || Clothes.new()}}
+    state = {user_id, Clothes.Database.get(user_id) || Clothes.new()}
+    {:noreply, state, @expiry_idle_timeout}
+  end
+
+  @impl GenServer
+  def handle_info(:timeout, {user_id, items}) do
+    IO.puts("Stopping clothes server for #{user_id}")
+    {:stop, :normal, {user_id, items}}
   end
 
   @impl GenServer
   def handle_cast({:add_item, new_item}, {user_id, items}) do
     new_clothes = Clothes.add_item(items, new_item)
     Clothes.Database.store(user_id, new_clothes)
-    {:noreply, {user_id, new_clothes}}
+    {:noreply, {user_id, new_clothes}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_cast({:update_item, item_id, updater_fun}, {user_id, items}) do
     new_clothes = Clothes.update_item(items, item_id, updater_fun)
     Clothes.Database.store(user_id, new_clothes)
-    {:noreply, {user_id, new_clothes}}
+    {:noreply, {user_id, new_clothes}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_cast({:update_item, new_item}, {user_id, items}) do
     new_clothes = Clothes.update_item(items, new_item)
     Clothes.Database.store(user_id, new_clothes)
-    {:noreply, {user_id, new_clothes}}
+    {:noreply, {user_id, new_clothes}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_cast({:delete_item, item_id}, {user_id, items}) do
     new_clothes = Clothes.delete_item(items, item_id)
     Clothes.Database.store(user_id, new_clothes)
-    {:noreply, {user_id, new_clothes}}
+    {:noreply, {user_id, new_clothes}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_call(:clothes, _, {user_id, items}) do
-    {:reply, Clothes.all(items), {user_id, items}}
+    {:reply, Clothes.all(items), {user_id, items}, @expiry_idle_timeout}
   end
 
   @impl GenServer
   def handle_call({:clothes, name, color}, _, {user_id, items}) do
-    {:reply, Clothes.clothes(items, name, color), {user_id, items}}
+    {:reply, Clothes.clothes(items, name, color), {user_id, items}, @expiry_idle_timeout}
   end
 end
