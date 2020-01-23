@@ -1,3 +1,4 @@
+use Mix.Config
 # This file is responsible for configuring your umbrella
 # and **all applications** and their dependencies with the
 # help of the Config module.
@@ -7,7 +8,8 @@
 # all use the same configuration file. If you want different
 # configurations or dependencies per app, it is best to
 # move said applications out of the umbrella.
-import Config
+# import Config
+import_config "../apps/*/config/config.exs"
 
 # Sample configuration:
 #

@@ -34,7 +34,7 @@ defmodule Clothes.Server do
     GenServer.cast(pid, {:delete_item, item_id})
   end
 
-  @expiry_idle_timeout :timer.seconds(10)
+  @expiry_idle_timeout :timer.seconds(60)
 
   @impl GenServer
   def init(user_id) do
