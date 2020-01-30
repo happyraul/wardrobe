@@ -29,6 +29,34 @@ defmodule Clothes.Web do
     |> Plug.Conn.send_resp(201, "OK")
   end
 
+  post "update_item" do
+    conn = Plug.Conn.fetch_query_params(conn)
+    user_id = Map.fetch!(conn.params, "user")
+    item_id = Map.fetch!(conn.params, "item_id") |> String.to_integer()
+
+    f = fn old_item ->
+      %{id: item_id}
+      |> (fn new_item -> case Map.fetch(conn.params, "name") do
+        {:ok, name} -> Map.put(new_item, :name, name)
+        :error -> Map.put(new_item, :name, old_item[:name])
+        end
+      end).()
+      |> (fn new_item -> case Map.fetch(conn.params, "color") do
+        {:ok, color} -> Map.put(new_item, :color, color)
+        :error -> Map.put(new_item, :color, old_item[:color])
+        end
+      end).()
+    end
+
+    user_id
+    |> Clothes.Cache.server_process()
+    |> Clothes.Server.update_item(item_id, f)
+
+    conn
+    |> Plug.Conn.put_resp_content_type("text/plain")
+    |> Plug.Conn.send_resp(200, "OK")
+  end
+
   get "/all" do
     conn = Plug.Conn.fetch_query_params(conn)
     user_id = Map.fetch!(conn.params, "user")
