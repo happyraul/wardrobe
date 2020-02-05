@@ -27,15 +27,31 @@ main =
 -- MODEL
 
 
+type alias ClothingItem =
+    { id : Int
+    , color : String
+    , name : String
+    }
+
+
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
+    , user : String
+    , clothes : List ClothingItem
     }
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model key url, Cmd.none )
+    ( Model key
+        url
+        "Raul"
+        [ ClothingItem 1 "green" "shirt"
+        , ClothingItem 2 "red" "shoes"
+        ]
+    , Cmd.none
+    )
 
 
 
@@ -79,19 +95,52 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "URL Interceptor"
+    let
+        subtitle =
+            case model.user of
+                "" ->
+                    "Nobody's clothes"
+
+                _ ->
+                    model.user ++ "'s clothes"
+    in
+    { title = "Wardrobe"
     , body =
-        [ text "The current URL is: "
-        , b [] [ text (Url.toString model.url) ]
-        , ul []
-            [ viewLink "/home"
-            , viewLink "/profile"
-            , viewLink "/reviews/the-century-of-the-self"
-            , viewLink "/reviews/public-opinion"
-            , viewLink "/reviews/shah-of-shahs"
-            ]
+        [ text "My Clothes"
+        , text subtitle
+        , div [] (List.map viewItem model.clothes)
         ]
     }
+
+
+viewItem : ClothingItem -> Html msg
+viewItem item =
+    div []
+        [ text
+            (String.join " "
+                [ String.fromInt item.id ++ ":"
+                , item.color
+                , item.name
+                ]
+            )
+        ]
+
+
+
+--view model =
+--    { title = "URL Interceptor"
+--    , body =
+--        [ text "The current URL is: "
+--        , b [] [ text (Url.toString model.url) ]
+--        , ul []
+--            [ viewLink "/home"
+--            , viewLink "/profile"
+--            , viewLink "/reviews/the-century-of-the-self"
+--            , viewLink "/reviews/public-opinion"
+--            , viewLink "/reviews/shah-of-shahs"
+--            ]
+--        ]
+--    }
 
 
 viewLink : String -> Html msg
