@@ -3,13 +3,19 @@
   <head>
     <meta charset="utf-8"/>
     <title>Wardrobe - Elm app</title>
-    <script type="text/javascript" src="<%= Routes.static_path(@conn, "/js/main.js") %>"></script>
+    <script type="text/javascript" src="<%= Routes.static_path(@conn, "/js/app.js") %>"></script>
   </head>
   <body>
     <p>Hi</p>
     <script>
-      var init = {};
-      var app = Elm.Main.init(init);
+      var init = {
+        flags: {
+          api: {
+            all: "<%= Routes.clothes_path(@conn, :all) %>"
+          }
+        }
+      }
+      var app = window.Elm.Main.init(init);
     </script>
   </body>
 </html>
