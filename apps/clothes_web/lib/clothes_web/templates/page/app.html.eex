@@ -11,7 +11,8 @@
       var init = {
         flags: {
           api: {
-            all: "<%= Routes.clothes_path(@conn, :all) %>"
+            all: "<%= Routes.clothes_path(@conn, :all) %>",
+            add_item: "<%= Routes.clothes_path(@conn, :add_item) %>"
           }
         }
       }

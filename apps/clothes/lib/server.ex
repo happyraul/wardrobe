@@ -11,7 +11,7 @@ defmodule Clothes.Server do
   end
 
   def add_item(pid, new_item) do
-    GenServer.cast(pid, {:add_item, new_item})
+    GenServer.call(pid, {:add_item, new_item})
   end
 
   def all(pid) do
@@ -55,13 +55,6 @@ defmodule Clothes.Server do
   end
 
   @impl GenServer
-  def handle_cast({:add_item, new_item}, {user_id, items}) do
-    new_clothes = Clothes.add_item(items, new_item)
-    Clothes.Database.store(user_id, new_clothes)
-    {:noreply, {user_id, new_clothes}, @expiry_idle_timeout}
-  end
-
-  @impl GenServer
   def handle_cast({:update_item, item_id, updater_fun}, {user_id, items}) do
     new_clothes = Clothes.update_item(items, item_id, updater_fun)
     Clothes.Database.store(user_id, new_clothes)
@@ -90,5 +83,12 @@ defmodule Clothes.Server do
   @impl GenServer
   def handle_call({:clothes, name, color}, _, {user_id, items}) do
     {:reply, Clothes.clothes(items, name, color), {user_id, items}, @expiry_idle_timeout}
+  end
+
+  @impl GenServer
+  def handle_call({:add_item, new_item}, _, {user_id, items}) do
+    {new_clothes, item_id} = Clothes.add_item(items, new_item)
+    Clothes.Database.store(user_id, new_clothes)
+    {:reply, item_id, {user_id, new_clothes}, @expiry_idle_timeout}
   end
 end

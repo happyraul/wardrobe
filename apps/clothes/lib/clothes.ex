@@ -24,7 +24,7 @@ defmodule Clothes do
     item = Map.put(item, :id, items.auto_id)
     new_clothing = Map.put(items.clothing, items.auto_id, item)
 
-    %Clothes{items | clothing: new_clothing, auto_id: items.auto_id + 1}
+    {%Clothes{items | clothing: new_clothing, auto_id: items.auto_id + 1}, items.auto_id}
   end
 
   def all(items) do

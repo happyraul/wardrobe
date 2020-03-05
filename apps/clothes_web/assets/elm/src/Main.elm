@@ -3,9 +3,11 @@ module Main exposing (main)
 import Browser
 import Browser.Navigation as Nav
 import Element exposing (..)
+import Element.Border as Border
 import Element.Input as Input
 import Http
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Url
 import Url.Builder as Builder
 
@@ -32,6 +34,7 @@ main =
 
 type alias Api =
     { all : String
+    , addItem : String
     }
 
 
@@ -67,7 +70,7 @@ init flagsJson url key =
                     decodedApi
 
                 Err error ->
-                    Debug.log (Decode.errorToString error) (Api "")
+                    Debug.log (Decode.errorToString error) (Api "" "")
     in
     ( Model key
         url
@@ -91,10 +94,20 @@ requestClothes url userId =
         }
 
 
+addItem : String -> String -> { color : String, name : String } -> Cmd Msg
+addItem url userId item =
+    Http.post
+        { url = Builder.relative [ url ] [ Builder.string "user" userId ]
+        , body = Http.jsonBody (itemEncoder item)
+        , expect = Http.expectJson ItemAdded (itemDecoder item)
+        }
+
+
 apiDecoder : Decode.Decoder Api
 apiDecoder =
-    Decode.map Api
+    Decode.map2 Api
         (Decode.at [ "api", "all" ] Decode.string)
+        (Decode.at [ "api", "add_item" ] Decode.string)
 
 
 clothingItemsDecoder : Decode.Decoder (List ClothingItem)
@@ -107,6 +120,27 @@ clothingItemsDecoder =
                 (Decode.field "name" Decode.string)
 
 
+itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
+itemDecoder item =
+    Decode.field "data" <|
+        Decode.map3 ClothingItem
+            (Decode.field "id" Decode.int)
+            (Decode.succeed item.color)
+            (Decode.succeed item.name)
+
+
+itemEncoder : { color : String, name : String } -> Encode.Value
+itemEncoder item =
+    Encode.object
+        [ ( "data"
+          , Encode.object
+                [ ( "color", Encode.string item.color )
+                , ( "name", Encode.string item.name )
+                ]
+          )
+        ]
+
+
 
 -- UPDATE
 
@@ -116,6 +150,8 @@ type Msg
     | UrlChanged Url.Url
     | ClothesLoaded (Result Http.Error (List ClothingItem))
     | TypedInput FormInput String
+    | AddPressed
+    | ItemAdded (Result Http.Error ClothingItem)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -150,6 +186,23 @@ update msg model =
                 Name ->
                     ( { model | nameInput = inputValue }, Cmd.none )
 
+        AddPressed ->
+            ( model
+            , addItem model.api.addItem
+                "raul"
+                { color = model.colorInput
+                , name = model.nameInput
+                }
+            )
+
+        ItemAdded result ->
+            case result of
+                Ok item ->
+                    ( { model | clothes = item :: model.clothes }, Cmd.none )
+
+                Err error ->
+                    ( model, Cmd.none )
+
 
 
 -- SUBSCRIPTIONS
@@ -162,6 +215,12 @@ subscriptions _ =
 
 
 -- VIEW
+
+
+colors =
+    { royalBlue = rgb 0.25 0.41 0.88
+    , black = rgb 0.1 0.1 0.1
+    }
 
 
 view : Model -> Browser.Document Msg
@@ -204,6 +263,10 @@ viewForm colorInput nameInput =
             , text = nameInput
             , placeholder = viewPlaceholder "enter a name"
             , label = Input.labelAbove [] (text "name")
+            }
+        , Input.button [ Border.width 1, Border.color colors.black ]
+            { onPress = Just AddPressed
+            , label = text "Add Item"
             }
         ]
 

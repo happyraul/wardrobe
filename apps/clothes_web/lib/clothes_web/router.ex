@@ -28,5 +28,6 @@ defmodule ClothesWeb.Router do
     pipe_through :api
 
     get "/all", ClothesController, :all
+    post "/add_item", ClothesController, :add_item
   end
 end
