@@ -189,33 +189,20 @@ view model =
 viewForm : String -> String -> Element Msg
 viewForm colorInput nameInput =
     let
-        colorPlaceholder =
-            case colorInput of
-                "" ->
-                    Just (Input.placeholder [] (text "enter a color"))
-
-                _ ->
-                    Nothing
-
-        namePlaceholder =
-            case nameInput of
-                "" ->
-                    Just (Input.placeholder [] (text "enter a name"))
-
-                _ ->
-                    Nothing
+        viewPlaceholder placeholder =
+            Just (Input.placeholder [] (text placeholder))
     in
     row []
         [ Input.text []
             { onChange = TypedInput Color
             , text = colorInput
-            , placeholder = colorPlaceholder
+            , placeholder = viewPlaceholder "enter a color"
             , label = Input.labelAbove [] (text "color")
             }
         , Input.text []
             { onChange = TypedInput Name
             , text = nameInput
-            , placeholder = namePlaceholder
+            , placeholder = viewPlaceholder "enter a name"
             , label = Input.labelAbove [] (text "name")
             }
         ]
