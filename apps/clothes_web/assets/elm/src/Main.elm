@@ -4,10 +4,16 @@ import Browser
 import Browser.Navigation as Nav
 import Element exposing (..)
 import Element.Border as Border
+import Element.Events as Events
+import Element.Font as Font
 import Element.Input as Input
+import FontAwesome.Duotone as Duotone
+import FontAwesome.Icon as Icon exposing (Icon)
+import FontAwesome.Styles as Icon
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Svg
 import Url
 import Url.Builder as Builder
 
@@ -33,9 +39,7 @@ main =
 
 
 type alias Api =
-    { all : String
-    , addItem : String
-    }
+    String
 
 
 type alias ClothingItem =
@@ -70,7 +74,7 @@ init flagsJson url key =
                     decodedApi
 
                 Err error ->
-                    Debug.log (Decode.errorToString error) (Api "" "")
+                    Debug.log (Decode.errorToString error) ""
     in
     ( Model key
         url
@@ -82,8 +86,12 @@ init flagsJson url key =
         ""
         -- nameInput
         ""
-    , requestClothes api.all "raul"
+    , requestClothes api "raul"
     )
+
+
+
+-- HTTP COMMANDS
 
 
 requestClothes : String -> String -> Cmd Msg
@@ -103,11 +111,31 @@ addItem url userId item =
         }
 
 
+deleteItem : String -> String -> Int -> Cmd Msg
+deleteItem url userId id =
+    Http.request
+        { method = "DELETE"
+        , headers = []
+        , url =
+            Builder.relative
+                [ url
+                , String.fromInt id
+                ]
+                [ Builder.string "user" userId ]
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever (ItemDeleted id)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+
+-- DECODERS
+
+
 apiDecoder : Decode.Decoder Api
 apiDecoder =
-    Decode.map2 Api
-        (Decode.at [ "api", "all" ] Decode.string)
-        (Decode.at [ "api", "add_item" ] Decode.string)
+    Decode.at [ "api", "items" ] Decode.string
 
 
 clothingItemsDecoder : Decode.Decoder (List ClothingItem)
@@ -151,7 +179,9 @@ type Msg
     | ClothesLoaded (Result Http.Error (List ClothingItem))
     | TypedInput FormInput String
     | AddPressed
+    | DeletePressed Int
     | ItemAdded (Result Http.Error ClothingItem)
+    | ItemDeleted Int (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -187,18 +217,36 @@ update msg model =
                     ( { model | nameInput = inputValue }, Cmd.none )
 
         AddPressed ->
-            ( model
-            , addItem model.api.addItem
+            ( { model | colorInput = "", nameInput = "" }
+            , addItem model.api
                 "raul"
                 { color = model.colorInput
                 , name = model.nameInput
                 }
             )
 
+        DeletePressed id ->
+            ( model, deleteItem model.api "raul" id )
+
         ItemAdded result ->
             case result of
                 Ok item ->
                     ( { model | clothes = item :: model.clothes }, Cmd.none )
+
+                Err error ->
+                    ( model, Cmd.none )
+
+        ItemDeleted id result ->
+            case result of
+                Ok () ->
+                    ( { model
+                        | clothes =
+                            List.filter
+                                (\item -> item.id /= id)
+                                model.clothes
+                      }
+                    , Cmd.none
+                    )
 
                 Err error ->
                     ( model, Cmd.none )
@@ -219,6 +267,7 @@ subscriptions _ =
 
 colors =
     { royalBlue = rgb 0.25 0.41 0.88
+    , warning = rgb 0.88 0.05 0.05
     , black = rgb 0.1 0.1 0.1
     }
 
@@ -235,12 +284,13 @@ view model =
                     model.user ++ "'s clothes"
     in
     Browser.Document "Wardrobe"
-        [ layout [] <|
+        [ Icon.css
+        , layout [] <|
             column []
                 [ text "My Clothes"
                 , viewForm model.colorInput model.nameInput
                 , text subtitle
-                , column [] (List.map viewItem model.clothes)
+                , column [ spacing 3 ] (List.map viewItem model.clothes)
                 ]
         ]
 
@@ -271,17 +321,33 @@ viewForm colorInput nameInput =
         ]
 
 
-viewItem : ClothingItem -> Element msg
-viewItem item =
-    row []
-        [ text
-            (String.join " "
-                [ String.fromInt item.id ++ ":"
-                , item.color
-                , item.name
+viewItem : ClothingItem -> Element Msg
+viewItem { id, color, name } =
+    column [ width fill ]
+        [ row [ width fill, spacing 5 ]
+            [ el [ width <| fillPortion 20 ]
+                (text
+                    (String.join " "
+                        [ String.fromInt id ++ ":"
+                        , color
+                        , name
+                        ]
+                    )
+                )
+            , el
+                [ width <| fillPortion 1
+                , pointer
+                , mouseOver [ Font.color colors.warning ]
+                , Events.onClick <| DeletePressed id
                 ]
-            )
+                (viewIcon Duotone.trashAlt [])
+            ]
         ]
+
+
+viewIcon : Icon -> List (Svg.Attribute msg) -> Element msg
+viewIcon icon styles =
+    html (icon |> Icon.present |> Icon.styled styles |> Icon.view)
 
 
 

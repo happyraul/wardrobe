@@ -27,7 +27,9 @@ defmodule ClothesWeb.Router do
   scope "/api", ClothesWeb.Api do
     pipe_through :api
 
-    get "/all", ClothesController, :all
-    post "/add_item", ClothesController, :add_item
+    # get "/all", ClothesController, :all
+    # post "/add_item", ClothesController, :add_item
+
+    resources "/items", ClothesController, only: [:index, :create, :delete]
   end
 end

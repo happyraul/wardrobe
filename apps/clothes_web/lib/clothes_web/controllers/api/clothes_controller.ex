@@ -1,7 +1,7 @@
 defmodule ClothesWeb.Api.ClothesController do
   use ClothesWeb, :controller
 
-  def all(conn, _params) do
+  def index(conn, _params) do
     conn = Plug.Conn.fetch_query_params(conn)
     user_id = Map.fetch!(conn.params, "user")
 
@@ -13,19 +13,31 @@ defmodule ClothesWeb.Api.ClothesController do
     render(conn, "all.json", items: items)
   end
 
-  def add_item(conn, params) do
+  def create(conn, params) do
     IO.inspect(params["data"])
     conn = Plug.Conn.fetch_query_params(conn)
     user_id = Map.fetch!(conn.params, "user")
 
-    item = params["data"]
-     |> Map.new(fn {key, value} -> {String.to_atom(key), value} end)
+    item =
+      params["data"]
+      |> Map.new(fn {key, value} -> {String.to_atom(key), value} end)
 
-     item_id =
+    item_id =
       user_id
       |> Clothes.Cache.server_process()
       |> Clothes.Server.add_item(item)
 
     render(conn, "item.json", item_id: item_id)
+  end
+
+  def delete(conn, %{"id" => id}) do
+    conn = Plug.Conn.fetch_query_params(conn)
+    user_id = Map.fetch!(conn.params, "user")
+
+    user_id
+    |> Clothes.Cache.server_process()
+    |> Clothes.Server.delete_item(String.to_integer(id))
+
+    text(conn, "deleted (maybe?)")
   end
 end
