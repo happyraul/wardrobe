@@ -1,8 +1,10 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Events as BE
 import Browser.Navigation as Nav
 import Element exposing (..)
+import Element.Background as Background
 import Element.Border as Border
 import Element.Events as Events
 import Element.Font as Font
@@ -57,6 +59,8 @@ type alias Model =
     , clothes : List ClothingItem
     , colorInput : String
     , nameInput : String
+    , showTooltip : Bool
+    , mousePosition : ( Float, Float )
     }
 
 
@@ -86,6 +90,10 @@ init flagsJson url key =
         ""
         -- nameInput
         ""
+        -- showTooltip
+        False
+        -- mousePosition
+        ( 0.0, 0.0 )
     , requestClothes api "raul"
     )
 
@@ -178,6 +186,9 @@ type Msg
     | UrlChanged Url.Url
     | ClothesLoaded (Result Http.Error (List ClothingItem))
     | TypedInput FormInput String
+    | MouseMoved ( Float, Float )
+    | EnteredTooltip
+    | LeftTooltip
     | AddPressed
     | DeletePressed Int
     | ItemAdded (Result Http.Error ClothingItem)
@@ -215,6 +226,15 @@ update msg model =
 
                 Name ->
                     ( { model | nameInput = inputValue }, Cmd.none )
+
+        MouseMoved pos ->
+            ( { model | mousePosition = pos }, Cmd.none )
+
+        EnteredTooltip ->
+            ( { model | showTooltip = True }, Cmd.none )
+
+        LeftTooltip ->
+            ( { model | showTooltip = False }, Cmd.none )
 
         AddPressed ->
             ( { model | colorInput = "", nameInput = "" }
@@ -257,17 +277,39 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    if model.showTooltip then
+        BE.onMouseMove (Decode.map MouseMoved decodePosition)
+
+    else
+        Sub.none
+
+
+decodePosition : Decode.Decoder ( Float, Float )
+decodePosition =
+    Decode.map2 Tuple.pair
+        (decodeCoordinate "pageX")
+        (decodeCoordinate "pageY")
+
+
+decodeCoordinate : String -> Decode.Decoder Float
+decodeCoordinate field =
+    Decode.field field Decode.float
 
 
 
 -- VIEW
 
 
+edges =
+    { top = 0, right = 0, bottom = 0, left = 0 }
+
+
 colors =
     { royalBlue = rgb 0.25 0.41 0.88
     , warning = rgb 0.88 0.05 0.05
+    , lightRed = rgb 0.88 0.35 0.35
+    , offWhite = rgb 0.97 0.97 0.97
     , black = rgb 0.1 0.1 0.1
     }
 
@@ -285,7 +327,16 @@ view model =
     in
     Browser.Document "Wardrobe"
         [ Icon.css
-        , layout [] <|
+        , layout
+            [ inFront
+                (el
+                    [ moveRight (Tuple.first model.mousePosition + 20.0)
+                    , moveDown (Tuple.second model.mousePosition - 5.0)
+                    ]
+                    (viewTooltip model.showTooltip)
+                )
+            ]
+          <|
             column []
                 [ text "My Clothes"
                 , viewForm model.colorInput model.nameInput
@@ -339,6 +390,8 @@ viewItem { id, color, name } =
                 , pointer
                 , mouseOver [ Font.color colors.warning ]
                 , Events.onClick <| DeletePressed id
+                , Events.onMouseEnter EnteredTooltip
+                , Events.onMouseLeave LeftTooltip
                 ]
                 (viewIcon Duotone.trashAlt [])
             ]
@@ -348,6 +401,24 @@ viewItem { id, color, name } =
 viewIcon : Icon -> List (Svg.Attribute msg) -> Element msg
 viewIcon icon styles =
     html (icon |> Icon.present |> Icon.styled styles |> Icon.view)
+
+
+viewTooltip : Bool -> Element msg
+viewTooltip show =
+    if show then
+        el
+            [ Font.size 12
+            , Font.color colors.offWhite
+            , Background.color colors.lightRed
+
+            --Border.color colors.black
+            --, Border.width 1
+            , paddingEach { edges | top = 5, bottom = 4, left = 4, right = 4 }
+            ]
+            (text "Delete item")
+
+    else
+        none
 
 
 
