@@ -48,7 +48,31 @@ type alias ClothingItem =
     { id : Int
     , color : String
     , name : String
+    , state : ItemState
     }
+
+
+type ItemState
+    = ModeEdit
+    | ModeView
+
+
+swapState : Int -> ClothingItem -> ClothingItem
+swapState id item =
+    if id == item.id then
+        let
+            newState =
+                case item.state of
+                    ModeEdit ->
+                        ModeView
+
+                    ModeView ->
+                        ModeEdit
+        in
+        { item | state = newState }
+
+    else
+        item
 
 
 type alias Model =
@@ -59,9 +83,19 @@ type alias Model =
     , clothes : List ClothingItem
     , colorInput : String
     , nameInput : String
-    , showTooltip : Bool
+    , showTooltip : TooltipState
     , mousePosition : ( Float, Float )
     }
+
+
+type TooltipState
+    = Off
+    | On Tooltip
+
+
+type Tooltip
+    = Delete
+    | Edit
 
 
 type FormInput
@@ -91,7 +125,7 @@ init flagsJson url key =
         -- nameInput
         ""
         -- showTooltip
-        False
+        Off
         -- mousePosition
         ( 0.0, 0.0 )
     , requestClothes api "raul"
@@ -150,19 +184,21 @@ clothingItemsDecoder : Decode.Decoder (List ClothingItem)
 clothingItemsDecoder =
     Decode.field "data" <|
         Decode.list <|
-            Decode.map3 ClothingItem
+            Decode.map4 ClothingItem
                 (Decode.field "id" Decode.int)
                 (Decode.field "color" Decode.string)
                 (Decode.field "name" Decode.string)
+                (Decode.succeed ModeView)
 
 
 itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
 itemDecoder item =
     Decode.field "data" <|
-        Decode.map3 ClothingItem
+        Decode.map4 ClothingItem
             (Decode.field "id" Decode.int)
             (Decode.succeed item.color)
             (Decode.succeed item.name)
+            (Decode.succeed ModeView)
 
 
 itemEncoder : { color : String, name : String } -> Encode.Value
@@ -187,10 +223,11 @@ type Msg
     | ClothesLoaded (Result Http.Error (List ClothingItem))
     | TypedInput FormInput String
     | MouseMoved ( Float, Float )
-    | EnteredTooltip
+    | EnteredTooltip Tooltip
     | LeftTooltip
     | AddPressed
     | DeletePressed Int
+    | EditPressed Int
     | ItemAdded (Result Http.Error ClothingItem)
     | ItemDeleted Int (Result Http.Error ())
 
@@ -230,11 +267,11 @@ update msg model =
         MouseMoved pos ->
             ( { model | mousePosition = pos }, Cmd.none )
 
-        EnteredTooltip ->
-            ( { model | showTooltip = True }, Cmd.none )
+        EnteredTooltip tooltip ->
+            ( { model | showTooltip = On tooltip }, Cmd.none )
 
         LeftTooltip ->
-            ( { model | showTooltip = False }, Cmd.none )
+            ( { model | showTooltip = Off }, Cmd.none )
 
         AddPressed ->
             ( { model | colorInput = "", nameInput = "" }
@@ -247,6 +284,11 @@ update msg model =
 
         DeletePressed id ->
             ( model, deleteItem model.api "raul" id )
+
+        EditPressed id ->
+            ( { model | clothes = List.map (swapState id) model.clothes }
+            , Cmd.none
+            )
 
         ItemAdded result ->
             case result of
@@ -278,11 +320,12 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.showTooltip then
-        BE.onMouseMove (Decode.map MouseMoved decodePosition)
+    case model.showTooltip of
+        Off ->
+            Sub.none
 
-    else
-        Sub.none
+        On _ ->
+            BE.onMouseMove (Decode.map MouseMoved decodePosition)
 
 
 decodePosition : Decode.Decoder ( Float, Float )
@@ -309,6 +352,8 @@ colors =
     { royalBlue = rgb 0.25 0.41 0.88
     , warning = rgb 0.88 0.05 0.05
     , lightRed = rgb 0.88 0.35 0.35
+    , bananaMania = rgb 0.98 0.906 0.71
+    , cadmiumGreen = rgb 0 0.42 0.235
     , offWhite = rgb 0.97 0.97 0.97
     , black = rgb 0.1 0.1 0.1
     }
@@ -337,11 +382,11 @@ view model =
                 )
             ]
           <|
-            column []
+            column [ width fill ]
                 [ text "My Clothes"
                 , viewForm model.colorInput model.nameInput
                 , text subtitle
-                , column [ spacing 3 ] (List.map viewItem model.clothes)
+                , viewItems model.clothes
                 ]
         ]
 
@@ -372,28 +417,146 @@ viewForm colorInput nameInput =
         ]
 
 
+viewItems : List ClothingItem -> Element Msg
+viewItems items =
+    --column [ spacing 3, width fill ] (List.map viewItem items)
+    table []
+        { data = items
+        , columns =
+            [ { header = text "Color"
+              , width = fillPortion 2
+              , view = \{ color, state } -> viewField (viewProperty color state)
+              }
+            , { header = text "Name"
+              , width = fillPortion 3
+              , view = \{ name, state } -> viewField (viewProperty name state)
+              }
+            , { header = none
+              , width = fillPortion 2
+              , view = \{ id } -> viewField (viewEditButton id)
+              }
+            , { header = none
+              , width = fillPortion 1
+              , view = \{ id } -> viewField (viewDeleteButton id)
+              }
+            ]
+        }
+
+
+viewField : Element Msg -> Element Msg
+viewField child =
+    column
+        [ Border.widthEach { edges | top = 1 }
+        , paddingEach { edges | top = 3, left = 3, bottom = 3 }
+        , height fill
+        ]
+        [ child ]
+
+
+viewProperty : String -> ItemState -> Element Msg
+viewProperty value state =
+    case state of
+        ModeView ->
+            el
+                [ height (px 46)
+                , paddingEach { edges | top = 13, left = 13 }
+                ]
+                (text value)
+
+        ModeEdit ->
+            Input.text [ height (px 46) ]
+                { onChange = TypedInput Color
+                , text = value
+                , placeholder = Nothing
+                , label = Input.labelHidden value
+                }
+
+
+viewEditButton : Int -> Element Msg
+viewEditButton id =
+    el
+        [ mouseOver [ Font.color colors.cadmiumGreen ]
+        , Events.onClick <| EditPressed id
+        , Events.onMouseEnter (EnteredTooltip Edit)
+        , Events.onMouseLeave LeftTooltip
+        , centerY
+        , centerX
+        ]
+        (viewIcon Duotone.edit [])
+
+
+viewDeleteButton : Int -> Element Msg
+viewDeleteButton id =
+    el
+        [ pointer
+        , mouseOver [ Font.color colors.warning ]
+        , Events.onClick <| DeletePressed id
+        , Events.onMouseEnter (EnteredTooltip Delete)
+        , Events.onMouseLeave LeftTooltip
+        , centerY
+        ]
+        (viewIcon Duotone.trashAlt [])
+
+
 viewItem : ClothingItem -> Element Msg
-viewItem { id, color, name } =
+viewItem { id, color, name, state } =
+    let
+        itemDetails =
+            case state of
+                ModeView ->
+                    el [ width fill ]
+                        (text
+                            (String.join " "
+                                [ color
+                                , name
+                                ]
+                            )
+                        )
+
+                ModeEdit ->
+                    row [ width fill ]
+                        [ Input.text []
+                            { onChange = TypedInput Color
+                            , text = color
+                            , placeholder = Nothing
+                            , label = Input.labelHidden "color"
+                            }
+                        , Input.text []
+                            { onChange = TypedInput Name
+                            , text = name
+                            , placeholder = Nothing
+                            , label = Input.labelHidden "name"
+                            }
+                        , Input.button [ Border.width 1, Border.color colors.black ]
+                            { onPress = Nothing
+                            , label = text "Save"
+                            }
+                        , Input.button [ Border.width 1, Border.color colors.black ]
+                            { onPress = Nothing
+                            , label = text "Cancel"
+                            }
+                        ]
+    in
     column [ width fill ]
         [ row [ width fill, spacing 5 ]
-            [ el [ width <| fillPortion 20 ]
-                (text
-                    (String.join " "
-                        [ String.fromInt id ++ ":"
-                        , color
-                        , name
-                        ]
-                    )
-                )
+            [ itemDetails
             , el
-                [ width <| fillPortion 1
-                , pointer
-                , mouseOver [ Font.color colors.warning ]
-                , Events.onClick <| DeletePressed id
-                , Events.onMouseEnter EnteredTooltip
+                [ mouseOver [ Font.color colors.cadmiumGreen ]
+                , Events.onClick <| EditPressed id
+                , Events.onMouseEnter (EnteredTooltip Edit)
                 , Events.onMouseLeave LeftTooltip
                 ]
-                (viewIcon Duotone.trashAlt [])
+                (viewIcon Duotone.edit [])
+            , row []
+                [ el
+                    [ pointer
+                    , mouseOver [ Font.color colors.warning ]
+                    , Events.onClick <| DeletePressed id
+                    , Events.onMouseEnter (EnteredTooltip Delete)
+                    , Events.onMouseLeave LeftTooltip
+                    ]
+                    (viewIcon Duotone.trashAlt [])
+                ]
             ]
         ]
 
@@ -403,25 +566,56 @@ viewIcon icon styles =
     html (icon |> Icon.present |> Icon.styled styles |> Icon.view)
 
 
-viewTooltip : Bool -> Element msg
-viewTooltip show =
-    if show then
-        el
-            [ Font.size 12
-            , Font.color colors.offWhite
-            , Background.color colors.lightRed
+viewTooltip : TooltipState -> Element msg
+viewTooltip state =
+    let
+        tt fontColor bgColor label =
+            el
+                [ Font.size 12
+                , Font.color fontColor
+                , Background.color bgColor
 
-            --Border.color colors.black
-            --, Border.width 1
-            , paddingEach { edges | top = 5, bottom = 4, left = 4, right = 4 }
-            ]
-            (text "Delete item")
+                --Border.color colors.black
+                --, Border.width 1
+                , paddingEach
+                    { edges
+                        | top = 5
+                        , bottom = 4
+                        , left = 4
+                        , right = 4
+                    }
+                ]
+                (text label)
+    in
+    case state of
+        Off ->
+            none
 
-    else
-        none
+        On tooltip ->
+            case tooltip of
+                Delete ->
+                    tt colors.offWhite colors.lightRed "Delete Item"
+
+                Edit ->
+                    tt colors.black colors.bananaMania "Edit Item"
 
 
 
+--el
+--    [ Font.size 12
+--    , Font.color colors.offWhite
+--    , Background.color colors.lightRed
+--    --Border.color colors.black
+--    --, Border.width 1
+--    , paddingEach
+--        { edges
+--            | top = 5
+--            , bottom = 4
+--            , left = 4
+--            , right = 4
+--        }
+--    ]
+--    (text "Delete Item")
 --view model =
 --    { title = "URL Interceptor"
 --    , body =
