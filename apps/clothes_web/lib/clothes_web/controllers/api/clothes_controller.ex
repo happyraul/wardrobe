@@ -30,6 +30,21 @@ defmodule ClothesWeb.Api.ClothesController do
     render(conn, "item.json", item_id: item_id)
   end
 
+  def update(conn, params) do
+    conn = Plug.Conn.fetch_query_params(conn)
+    user_id = Map.fetch!(conn.params, "user")
+
+    item =
+      params["data"]
+      |> Map.new(fn {key, value} -> {String.to_atom(key), value} end)
+
+    user_id
+      |> Clothes.Cache.server_process()
+      |> Clothes.Server.update_item(item)
+
+    render(conn, "item.json", item_id: item.id)
+  end
+
   def delete(conn, %{"id" => id}) do
     conn = Plug.Conn.fetch_query_params(conn)
     user_id = Map.fetch!(conn.params, "user")

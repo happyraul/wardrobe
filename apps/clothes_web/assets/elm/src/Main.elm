@@ -83,6 +83,8 @@ type alias Model =
     , clothes : List ClothingItem
     , colorInput : String
     , nameInput : String
+    , colorEditInput : String
+    , nameEditInput : String
     , showTooltip : TooltipState
     , mousePosition : ( Float, Float )
     }
@@ -96,11 +98,17 @@ type TooltipState
 type Tooltip
     = Delete
     | Edit
+    | Save
+
+
+type ItemAttribute
+    = Color
+    | Name
 
 
 type FormInput
-    = Color
-    | Name
+    = NewItem ItemAttribute
+    | EditItem ItemAttribute
 
 
 init : Decode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -123,6 +131,10 @@ init flagsJson url key =
         -- colorInput
         ""
         -- nameInput
+        ""
+        -- colorEditInput
+        ""
+        -- nameEditInput
         ""
         -- showTooltip
         Off
@@ -148,7 +160,14 @@ addItem : String -> String -> { color : String, name : String } -> Cmd Msg
 addItem url userId item =
     Http.post
         { url = Builder.relative [ url ] [ Builder.string "user" userId ]
-        , body = Http.jsonBody (itemEncoder item)
+        , body =
+            Http.jsonBody
+                (itemEncoder
+                    { id = Nothing
+                    , color = item.color
+                    , name = item.name
+                    }
+                )
         , expect = Http.expectJson ItemAdded (itemDecoder item)
         }
 
@@ -166,6 +185,31 @@ deleteItem url userId id =
                 [ Builder.string "user" userId ]
         , body = Http.emptyBody
         , expect = Http.expectWhatever (ItemDeleted id)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+updateItem : String -> String -> ClothingItem -> Cmd Msg
+updateItem url userId item =
+    Http.request
+        { method = "PATCH"
+        , headers = []
+        , url =
+            Builder.relative
+                [ url
+                , String.fromInt item.id
+                ]
+                [ Builder.string "user" userId ]
+        , body =
+            Http.jsonBody
+                (itemEncoder
+                    { id = Just item.id
+                    , color = item.color
+                    , name = item.name
+                    }
+                )
+        , expect = Http.expectWhatever (ItemUpdated item.id)
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -201,16 +245,24 @@ itemDecoder item =
             (Decode.succeed ModeView)
 
 
-itemEncoder : { color : String, name : String } -> Encode.Value
+itemEncoder : { id : Maybe Int, color : String, name : String } -> Encode.Value
 itemEncoder item =
+    let
+        fields =
+            case item.id of
+                Just id ->
+                    [ ( "id", Encode.int id )
+                    , ( "color", Encode.string item.color )
+                    , ( "name", Encode.string item.name )
+                    ]
+
+                Nothing ->
+                    [ ( "color", Encode.string item.color )
+                    , ( "name", Encode.string item.name )
+                    ]
+    in
     Encode.object
-        [ ( "data"
-          , Encode.object
-                [ ( "color", Encode.string item.color )
-                , ( "name", Encode.string item.name )
-                ]
-          )
-        ]
+        [ ( "data", Encode.object fields ) ]
 
 
 
@@ -227,9 +279,11 @@ type Msg
     | LeftTooltip
     | AddPressed
     | DeletePressed Int
-    | EditPressed Int
+    | EditPressed ClothingItem
+    | SavePressed ClothingItem
     | ItemAdded (Result Http.Error ClothingItem)
     | ItemDeleted Int (Result Http.Error ())
+    | ItemUpdated Int (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -258,11 +312,21 @@ update msg model =
 
         TypedInput inputType inputValue ->
             case inputType of
-                Color ->
-                    ( { model | colorInput = inputValue }, Cmd.none )
+                NewItem attribute ->
+                    case attribute of
+                        Color ->
+                            ( { model | colorInput = inputValue }, Cmd.none )
 
-                Name ->
-                    ( { model | nameInput = inputValue }, Cmd.none )
+                        Name ->
+                            ( { model | nameInput = inputValue }, Cmd.none )
+
+                EditItem attribute ->
+                    case attribute of
+                        Color ->
+                            ( { model | colorEditInput = inputValue }, Cmd.none )
+
+                        Name ->
+                            ( { model | nameEditInput = inputValue }, Cmd.none )
 
         MouseMoved pos ->
             ( { model | mousePosition = pos }, Cmd.none )
@@ -283,11 +347,34 @@ update msg model =
             )
 
         DeletePressed id ->
-            ( model, deleteItem model.api "raul" id )
+            ( { model | showTooltip = Off }, deleteItem model.api "raul" id )
 
-        EditPressed id ->
-            ( { model | clothes = List.map (swapState id) model.clothes }
+        EditPressed item ->
+            let
+                ( color, name ) =
+                    case item.state of
+                        ModeEdit ->
+                            ( "", "" )
+
+                        ModeView ->
+                            ( item.color, item.name )
+            in
+            ( { model
+                | clothes = List.map (swapState item.id) model.clothes
+                , colorEditInput = color
+                , nameEditInput = name
+              }
             , Cmd.none
+            )
+
+        SavePressed oldItem ->
+            ( { model | showTooltip = Off }
+            , updateItem model.api
+                "raul"
+                { oldItem
+                    | color = model.colorEditInput
+                    , name = model.nameEditInput
+                }
             )
 
         ItemAdded result ->
@@ -309,6 +396,30 @@ update msg model =
                       }
                     , Cmd.none
                     )
+
+                Err error ->
+                    ( model, Cmd.none )
+
+        ItemUpdated id result ->
+            case result of
+                Ok () ->
+                    let
+                        clothes =
+                            List.map
+                                (\item ->
+                                    if item.id == id then
+                                        { item
+                                            | state = ModeView
+                                            , color = model.colorEditInput
+                                            , name = model.nameEditInput
+                                        }
+
+                                    else
+                                        item
+                                )
+                                model.clothes
+                    in
+                    ( { model | clothes = clothes }, Cmd.none )
 
                 Err error ->
                     ( model, Cmd.none )
@@ -387,6 +498,8 @@ view model =
                 , viewForm model.colorInput model.nameInput
                 , text subtitle
                 , viewItems model.clothes
+                    model.colorEditInput
+                    model.nameEditInput
                 ]
         ]
 
@@ -399,13 +512,13 @@ viewForm colorInput nameInput =
     in
     row []
         [ Input.text []
-            { onChange = TypedInput Color
+            { onChange = TypedInput (NewItem Color)
             , text = colorInput
             , placeholder = viewPlaceholder "enter a color"
             , label = Input.labelAbove [] (text "color")
             }
         , Input.text []
-            { onChange = TypedInput Name
+            { onChange = TypedInput (NewItem Name)
             , text = nameInput
             , placeholder = viewPlaceholder "enter a name"
             , label = Input.labelAbove [] (text "name")
@@ -417,23 +530,27 @@ viewForm colorInput nameInput =
         ]
 
 
-viewItems : List ClothingItem -> Element Msg
-viewItems items =
+viewItems : List ClothingItem -> String -> String -> Element Msg
+viewItems items editedColor editedName =
     --column [ spacing 3, width fill ] (List.map viewItem items)
     table []
         { data = items
         , columns =
             [ { header = text "Color"
               , width = fillPortion 2
-              , view = \{ color, state } -> viewField (viewProperty color state)
+              , view = \{ color, state } -> viewField (viewProperty color state editedColor Color)
               }
             , { header = text "Name"
               , width = fillPortion 3
-              , view = \{ name, state } -> viewField (viewProperty name state)
+              , view = \{ name, state } -> viewField (viewProperty name state editedName Name)
               }
             , { header = none
               , width = fillPortion 2
-              , view = \{ id } -> viewField (viewEditButton id)
+              , view = \item -> viewField (viewSaveButton item)
+              }
+            , { header = none
+              , width = fillPortion 2
+              , view = \item -> viewField (viewEditButton item)
               }
             , { header = none
               , width = fillPortion 1
@@ -453,8 +570,8 @@ viewField child =
         [ child ]
 
 
-viewProperty : String -> ItemState -> Element Msg
-viewProperty value state =
+viewProperty : String -> ItemState -> String -> ItemAttribute -> Element Msg
+viewProperty value state editedValue itemAttribute =
     case state of
         ModeView ->
             el
@@ -465,24 +582,42 @@ viewProperty value state =
 
         ModeEdit ->
             Input.text [ height (px 46) ]
-                { onChange = TypedInput Color
-                , text = value
+                { onChange = TypedInput (EditItem itemAttribute)
+                , text = editedValue
                 , placeholder = Nothing
                 , label = Input.labelHidden value
                 }
 
 
-viewEditButton : Int -> Element Msg
-viewEditButton id =
+viewEditButton : ClothingItem -> Element Msg
+viewEditButton item =
     el
         [ mouseOver [ Font.color colors.cadmiumGreen ]
-        , Events.onClick <| EditPressed id
+        , Events.onClick <| EditPressed item
         , Events.onMouseEnter (EnteredTooltip Edit)
         , Events.onMouseLeave LeftTooltip
         , centerY
         , centerX
         ]
         (viewIcon Duotone.edit [])
+
+
+viewSaveButton : ClothingItem -> Element Msg
+viewSaveButton item =
+    case item.state of
+        ModeEdit ->
+            el
+                [ mouseOver [ Font.color colors.cadmiumGreen ]
+                , Events.onClick <| SavePressed item
+                , Events.onMouseEnter (EnteredTooltip Save)
+                , Events.onMouseLeave LeftTooltip
+                , centerY
+                , centerX
+                ]
+                (viewIcon Duotone.save [])
+
+        ModeView ->
+            none
 
 
 viewDeleteButton : Int -> Element Msg
@@ -496,69 +631,6 @@ viewDeleteButton id =
         , centerY
         ]
         (viewIcon Duotone.trashAlt [])
-
-
-viewItem : ClothingItem -> Element Msg
-viewItem { id, color, name, state } =
-    let
-        itemDetails =
-            case state of
-                ModeView ->
-                    el [ width fill ]
-                        (text
-                            (String.join " "
-                                [ color
-                                , name
-                                ]
-                            )
-                        )
-
-                ModeEdit ->
-                    row [ width fill ]
-                        [ Input.text []
-                            { onChange = TypedInput Color
-                            , text = color
-                            , placeholder = Nothing
-                            , label = Input.labelHidden "color"
-                            }
-                        , Input.text []
-                            { onChange = TypedInput Name
-                            , text = name
-                            , placeholder = Nothing
-                            , label = Input.labelHidden "name"
-                            }
-                        , Input.button [ Border.width 1, Border.color colors.black ]
-                            { onPress = Nothing
-                            , label = text "Save"
-                            }
-                        , Input.button [ Border.width 1, Border.color colors.black ]
-                            { onPress = Nothing
-                            , label = text "Cancel"
-                            }
-                        ]
-    in
-    column [ width fill ]
-        [ row [ width fill, spacing 5 ]
-            [ itemDetails
-            , el
-                [ mouseOver [ Font.color colors.cadmiumGreen ]
-                , Events.onClick <| EditPressed id
-                , Events.onMouseEnter (EnteredTooltip Edit)
-                , Events.onMouseLeave LeftTooltip
-                ]
-                (viewIcon Duotone.edit [])
-            , row []
-                [ el
-                    [ pointer
-                    , mouseOver [ Font.color colors.warning ]
-                    , Events.onClick <| DeletePressed id
-                    , Events.onMouseEnter (EnteredTooltip Delete)
-                    , Events.onMouseLeave LeftTooltip
-                    ]
-                    (viewIcon Duotone.trashAlt [])
-                ]
-            ]
-        ]
 
 
 viewIcon : Icon -> List (Svg.Attribute msg) -> Element msg
@@ -598,6 +670,9 @@ viewTooltip state =
 
                 Edit ->
                     tt colors.black colors.bananaMania "Edit Item"
+
+                Save ->
+                    tt colors.offWhite colors.cadmiumGreen "Save Item"
 
 
 

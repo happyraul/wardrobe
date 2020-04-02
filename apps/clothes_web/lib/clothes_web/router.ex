@@ -30,6 +30,6 @@ defmodule ClothesWeb.Router do
     # get "/all", ClothesController, :all
     # post "/add_item", ClothesController, :add_item
 
-    resources "/items", ClothesController, only: [:index, :create, :delete]
+    resources "/items", ClothesController, only: [:index, :create, :update, :delete]
   end
 end
