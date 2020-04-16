@@ -21,13 +21,6 @@ defmodule Clothes do
   #   Enum.reduce(entries, %Clothes{}, &add_item(&2, &1))
   # end
 
-  # def add_item(items, item) do
-  #   item = Map.put(item, :id, items.auto_id)
-  #   new_clothing = Map.put(items.clothing, items.auto_id, item)
-
-  #   {%Clothes{items | clothing: new_clothing, auto_id: items.auto_id + 1}, items.auto_id}
-  # end
-
   def get_users() do
     @repo.all(Clothes.User)
   end
@@ -42,9 +35,15 @@ defmodule Clothes do
     |> @repo.insert
   end
 
-  # def all() do
-  #   @repo.all(Clothes.User)
-  # end
+  def all() do
+    @repo.all(Clothes.Item)
+  end
+
+  def add_item(item) do
+    %Clothes.Item{}
+    |> Clothes.Item.changeset(item)
+    |> @repo.insert()
+  end
 
   # def clothes(items, name, color) do
   #   items.clothing

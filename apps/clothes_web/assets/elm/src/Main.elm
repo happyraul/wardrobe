@@ -45,7 +45,7 @@ type alias Api =
 
 
 type alias ClothingItem =
-    { id : Int
+    { id : String
     , color : String
     , name : String
     , state : ItemState
@@ -57,7 +57,7 @@ type ItemState
     | ModeView
 
 
-swapState : Int -> ClothingItem -> ClothingItem
+swapState : String -> ClothingItem -> ClothingItem
 swapState id item =
     if id == item.id then
         let
@@ -172,7 +172,7 @@ addItem url userId item =
         }
 
 
-deleteItem : String -> String -> Int -> Cmd Msg
+deleteItem : String -> String -> String -> Cmd Msg
 deleteItem url userId id =
     Http.request
         { method = "DELETE"
@@ -180,7 +180,7 @@ deleteItem url userId id =
         , url =
             Builder.relative
                 [ url
-                , String.fromInt id
+                , id
                 ]
                 [ Builder.string "user" userId ]
         , body = Http.emptyBody
@@ -198,7 +198,7 @@ updateItem url userId item =
         , url =
             Builder.relative
                 [ url
-                , String.fromInt item.id
+                , item.id
                 ]
                 [ Builder.string "user" userId ]
         , body =
@@ -229,7 +229,7 @@ clothingItemsDecoder =
     Decode.field "data" <|
         Decode.list <|
             Decode.map4 ClothingItem
-                (Decode.field "id" Decode.int)
+                (Decode.field "id" Decode.string)
                 (Decode.field "color" Decode.string)
                 (Decode.field "name" Decode.string)
                 (Decode.succeed ModeView)
@@ -239,19 +239,19 @@ itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
 itemDecoder item =
     Decode.field "data" <|
         Decode.map4 ClothingItem
-            (Decode.field "id" Decode.int)
+            (Decode.field "id" Decode.string)
             (Decode.succeed item.color)
             (Decode.succeed item.name)
             (Decode.succeed ModeView)
 
 
-itemEncoder : { id : Maybe Int, color : String, name : String } -> Encode.Value
+itemEncoder : { id : Maybe String, color : String, name : String } -> Encode.Value
 itemEncoder item =
     let
         fields =
             case item.id of
                 Just id ->
-                    [ ( "id", Encode.int id )
+                    [ ( "id", Encode.string id )
                     , ( "color", Encode.string item.color )
                     , ( "name", Encode.string item.name )
                     ]
@@ -278,12 +278,12 @@ type Msg
     | EnteredTooltip Tooltip
     | LeftTooltip
     | AddPressed
-    | DeletePressed Int
+    | DeletePressed String
     | EditPressed ClothingItem
     | SavePressed ClothingItem
     | ItemAdded (Result Http.Error ClothingItem)
-    | ItemDeleted Int (Result Http.Error ())
-    | ItemUpdated Int (Result Http.Error ())
+    | ItemDeleted String (Result Http.Error ())
+    | ItemUpdated String (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -620,7 +620,7 @@ viewSaveButton item =
             none
 
 
-viewDeleteButton : Int -> Element Msg
+viewDeleteButton : String -> Element Msg
 viewDeleteButton id =
     el
         [ pointer

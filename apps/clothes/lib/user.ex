@@ -10,6 +10,7 @@ defmodule Clothes.User do
     field(:password, :string, virtual: true)
     field(:hashed_password, :string)
     field(:display_name, :string)
+    has_many(:items, Clothes.Item)
     timestamps()
   end
 end

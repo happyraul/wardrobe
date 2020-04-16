@@ -39,8 +39,8 @@ defmodule ClothesWeb.Api.ClothesController do
       |> Map.new(fn {key, value} -> {String.to_atom(key), value} end)
 
     user_id
-      |> Clothes.Cache.server_process()
-      |> Clothes.Server.update_item(item)
+    |> Clothes.Cache.server_process()
+    |> Clothes.Server.update_item(item)
 
     render(conn, "item.json", item_id: item.id)
   end
