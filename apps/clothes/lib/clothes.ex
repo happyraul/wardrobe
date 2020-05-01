@@ -2,6 +2,8 @@ defmodule Clothes do
   @moduledoc """
   Documentation for Clothes.
   """
+  import Ecto
+  import Ecto.Query
 
   @repo Clothes.Repo
 
@@ -36,7 +38,22 @@ defmodule Clothes do
   end
 
   def all() do
-    @repo.all(Clothes.Item)
+    # select([t], %{categoty: t.category, max_date: max(t.date)})
+    wears_select =
+      from(
+        wear in Clothes.Wear,
+        select: %Clothes.Wear{item_id: wear.item_id, worn_at: max(wear.worn_at)},
+        group_by: [:item_id]
+      )
+
+    @repo.all(
+      from(
+        item in Clothes.Item,
+        left_join: wear in subquery(wears_select),
+        on: item.id == wear.item_id,
+        select: %Clothes.Item{item | last_worn: wear.worn_at}
+      )
+    )
   end
 
   def add_item(item) do
@@ -59,14 +76,19 @@ defmodule Clothes do
     |> @repo.update()
   end
 
-  # def delete_item(items, item_id) do
-  #   new_clothing =
-  #     items.clothing
-  #     |> Stream.filter(fn {id, _} -> id != item_id end)
-  #     |> Map.new()
+  def delete_item(item_id) do
+    %Clothes.Item{id: item_id}
+    |> @repo.delete()
+  end
 
-  #   %Clothes{items | clothing: new_clothing}
-  # end
+  def wear_item(id) do
+    %Clothes.Wear{}
+    |> Clothes.Wear.changeset(%{
+      item_id: id,
+      worn_at: DateTime.now!("Etc/UTC")
+    })
+    |> @repo.insert()
+  end
 end
 
 defimpl Collectable, for: Clothes do

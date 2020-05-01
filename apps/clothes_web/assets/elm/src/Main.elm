@@ -60,6 +60,7 @@ type alias ClothingItem =
     { id : String
     , color : String
     , name : String
+    , lastWorn : String
     , state : ItemState
     }
 
@@ -245,24 +246,32 @@ clothingItemsDecoder : Decode.Decoder (List ClothingItem)
 clothingItemsDecoder =
     Decode.field "data" <|
         Decode.list <|
-            Decode.map4 ClothingItem
+            Decode.map5 ClothingItem
                 (Decode.field "id" Decode.string)
                 (Decode.field "color" Decode.string)
                 (Decode.field "name" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "last_worn" Decode.string
+                    , Decode.succeed ""
+                    ]
+                )
                 (Decode.succeed ModeView)
 
 
 itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
 itemDecoder item =
     Decode.field "data" <|
-        Decode.map4 ClothingItem
+        Decode.map5 ClothingItem
             (Decode.field "id" Decode.string)
             (Decode.succeed item.color)
             (Decode.succeed item.name)
+            (Decode.succeed "")
             (Decode.succeed ModeView)
 
 
-itemEncoder : { id : Maybe String, color : String, name : String } -> Encode.Value
+itemEncoder :
+    { id : Maybe String, color : String, name : String }
+    -> Encode.Value
 itemEncoder item =
     let
         fields =
@@ -364,7 +373,9 @@ update msg model =
             )
 
         DeletePressed id ->
-            ( { model | showTooltip = Off }, deleteItem model.api model.user.id id )
+            ( { model | showTooltip = Off }
+            , deleteItem model.api model.user.id id
+            )
 
         EditPressed item ->
             let
@@ -560,6 +571,10 @@ viewItems items editedColor editedName =
             , { header = text "Name"
               , width = fillPortion 3
               , view = \{ name, state } -> viewField (viewProperty name state editedName Name)
+              }
+            , { header = text "Last Worn"
+              , width = fillPortion 3
+              , view = \{ lastWorn, state } -> viewField (text lastWorn)
               }
             , { header = none
               , width = fillPortion 2

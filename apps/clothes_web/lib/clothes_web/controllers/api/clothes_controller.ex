@@ -51,7 +51,7 @@ defmodule ClothesWeb.Api.ClothesController do
 
     user_id
     |> Clothes.Cache.server_process()
-    |> Clothes.Server.delete_item(String.to_integer(id))
+    |> Clothes.Server.delete_item(id)
 
     text(conn, "deleted (maybe?)")
   end

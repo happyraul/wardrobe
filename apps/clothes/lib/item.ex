@@ -25,7 +25,9 @@ defmodule Clothes.Item do
     field(:brand, :string)
     field(:value, :integer)
     field(:location, :string)
+    field(:last_worn, :utc_datetime, virtual: true)
     belongs_to(:user, Clothes.User)
+    has_many(:wears, Clothes.Wear)
     timestamps()
   end
 

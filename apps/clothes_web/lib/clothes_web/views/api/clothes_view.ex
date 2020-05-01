@@ -13,7 +13,8 @@ defmodule ClothesWeb.Api.ClothesView do
     %{
       id: item.id,
       name: item.name,
-      color: item.color
+      color: item.color,
+      last_worn: item.last_worn
     }
   end
 end
