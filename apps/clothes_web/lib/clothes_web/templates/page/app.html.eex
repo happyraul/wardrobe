@@ -12,6 +12,10 @@
         flags: {
           api: {
             items: "<%= Routes.clothes_path(@conn, :index) %>"
+          },
+          user: {
+            display_name: "Raul",
+            id: "11890ede-19fe-4114-9c92-1294bd98e099"
           }
         }
       }

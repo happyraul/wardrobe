@@ -40,6 +40,18 @@ main =
 -- MODEL
 
 
+type alias Flags =
+    { api : Api
+    , user : User
+    }
+
+
+type alias User =
+    { name : String
+    , id : String
+    }
+
+
 type alias Api =
     String
 
@@ -79,7 +91,7 @@ type alias Model =
     { key : Nav.Key
     , url : Url.Url
     , api : Api
-    , user : String
+    , user : User
     , clothes : List ClothingItem
     , colorInput : String
     , nameInput : String
@@ -114,18 +126,18 @@ type FormInput
 init : Decode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flagsJson url key =
     let
-        api =
-            case Decode.decodeValue apiDecoder flagsJson of
-                Ok decodedApi ->
-                    decodedApi
+        flags =
+            case Decode.decodeValue flagsDecoder flagsJson of
+                Ok decodedFlags ->
+                    decodedFlags
 
                 Err error ->
-                    Debug.log (Decode.errorToString error) ""
+                    Debug.log (Decode.errorToString error) Flags "" (User "" "")
     in
     ( Model key
         url
-        api
-        "Raul"
+        flags.api
+        flags.user
         -- clothing items
         []
         -- colorInput
@@ -140,7 +152,7 @@ init flagsJson url key =
         Off
         -- mousePosition
         ( 0.0, 0.0 )
-    , requestClothes api "raul"
+    , requestClothes flags.api flags.user.id
     )
 
 
@@ -219,9 +231,14 @@ updateItem url userId item =
 -- DECODERS
 
 
-apiDecoder : Decode.Decoder Api
-apiDecoder =
-    Decode.at [ "api", "items" ] Decode.string
+flagsDecoder : Decode.Decoder Flags
+flagsDecoder =
+    Decode.map2 Flags
+        (Decode.at [ "api", "items" ] Decode.string)
+        (Decode.map2 User
+            (Decode.at [ "user", "display_name" ] Decode.string)
+            (Decode.at [ "user", "id" ] Decode.string)
+        )
 
 
 clothingItemsDecoder : Decode.Decoder (List ClothingItem)
@@ -340,14 +357,14 @@ update msg model =
         AddPressed ->
             ( { model | colorInput = "", nameInput = "" }
             , addItem model.api
-                "raul"
+                model.user.id
                 { color = model.colorInput
                 , name = model.nameInput
                 }
             )
 
         DeletePressed id ->
-            ( { model | showTooltip = Off }, deleteItem model.api "raul" id )
+            ( { model | showTooltip = Off }, deleteItem model.api model.user.id id )
 
         EditPressed item ->
             let
@@ -370,7 +387,7 @@ update msg model =
         SavePressed oldItem ->
             ( { model | showTooltip = Off }
             , updateItem model.api
-                "raul"
+                model.user.id
                 { oldItem
                     | color = model.colorEditInput
                     , name = model.nameEditInput
@@ -474,12 +491,12 @@ view : Model -> Browser.Document Msg
 view model =
     let
         subtitle =
-            case model.user of
+            case model.user.name of
                 "" ->
                     "Nobody's clothes"
 
                 _ ->
-                    model.user ++ "'s clothes"
+                    model.user.name ++ "'s clothes"
     in
     Browser.Document "Wardrobe"
         [ Icon.css

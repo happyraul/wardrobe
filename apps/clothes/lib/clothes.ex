@@ -40,6 +40,8 @@ defmodule Clothes do
   end
 
   def add_item(item) do
+    IO.inspect(item)
+
     %Clothes.Item{}
     |> Clothes.Item.changeset(item)
     |> @repo.insert()
@@ -51,21 +53,11 @@ defmodule Clothes do
   #   |> Enum.map(fn {_, item} -> item end)
   # end
 
-  # def update_item(items, item_id, updater_fun) do
-  #   case Map.fetch(items.clothing, item_id) do
-  #     :error ->
-  #       items
-
-  #     {:ok, old_item} ->
-  #       new_item = updater_fun.(old_item)
-  #       new_clothing = Map.put(items.clothing, new_item.id, new_item)
-  #       %Clothes{items | clothing: new_clothing}
-  #   end
-  # end
-
-  # def update_item(items, %{} = new_item) do
-  #   update_item(items, new_item.id, fn _ -> new_item end)
-  # end
+  def update_item(%Clothes.Item{} = item, updates) do
+    item
+    |> Clothes.Item.changeset(updates)
+    |> @repo.update()
+  end
 
   # def delete_item(items, item_id) do
   #   new_clothing =
