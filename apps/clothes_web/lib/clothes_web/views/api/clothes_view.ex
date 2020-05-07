@@ -9,6 +9,10 @@ defmodule ClothesWeb.Api.ClothesView do
     %{data: %{id: item_id}}
   end
 
+  def render("wear.json", %{last_worn: last_worn}) do
+    %{data: %{last_worn: last_worn}}
+  end
+
   def render("item_detail.json", %{item: item}) do
     %{
       id: item.id,

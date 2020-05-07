@@ -53,7 +53,9 @@ type alias User =
 
 
 type alias Api =
-    String
+    { items : String
+    , wear : String
+    }
 
 
 type alias ClothingItem =
@@ -133,7 +135,7 @@ init flagsJson url key =
                     decodedFlags
 
                 Err error ->
-                    Debug.log (Decode.errorToString error) Flags "" (User "" "")
+                    Debug.log (Decode.errorToString error) Flags (Api "" "") (User "" "")
     in
     ( Model key
         url
@@ -153,7 +155,7 @@ init flagsJson url key =
         Off
         -- mousePosition
         ( 0.0, 0.0 )
-    , requestClothes flags.api flags.user.id
+    , requestClothes flags.api.items flags.user.id
     )
 
 
@@ -182,6 +184,22 @@ addItem url userId item =
                     }
                 )
         , expect = Http.expectJson ItemAdded (itemDecoder item)
+        }
+
+
+wearItem : String -> String -> String -> Cmd Msg
+wearItem url userId id =
+    Http.post
+        { url = Builder.relative [ url ] [ Builder.string "user" userId ]
+        , body =
+            Http.jsonBody
+                (Encode.object
+                    [ ( "data"
+                      , Encode.object [ ( "id", Encode.string id ) ]
+                      )
+                    ]
+                )
+        , expect = Http.expectJson (ItemWorn id) lastWornDecoder
         }
 
 
@@ -235,7 +253,10 @@ updateItem url userId item =
 flagsDecoder : Decode.Decoder Flags
 flagsDecoder =
     Decode.map2 Flags
-        (Decode.at [ "api", "items" ] Decode.string)
+        (Decode.map2 Api
+            (Decode.at [ "api", "items" ] Decode.string)
+            (Decode.at [ "api", "wear" ] Decode.string)
+        )
         (Decode.map2 User
             (Decode.at [ "user", "display_name" ] Decode.string)
             (Decode.at [ "user", "id" ] Decode.string)
@@ -256,6 +277,12 @@ clothingItemsDecoder =
                     ]
                 )
                 (Decode.succeed ModeView)
+
+
+lastWornDecoder : Decode.Decoder String
+lastWornDecoder =
+    Decode.field "data" <|
+        Decode.field "last_worn" Decode.string
 
 
 itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
@@ -304,10 +331,12 @@ type Msg
     | EnteredTooltip Tooltip
     | LeftTooltip
     | AddPressed
+    | WearPressed String
     | DeletePressed String
     | EditPressed ClothingItem
     | SavePressed ClothingItem
     | ItemAdded (Result Http.Error ClothingItem)
+    | ItemWorn String (Result Http.Error String)
     | ItemDeleted String (Result Http.Error ())
     | ItemUpdated String (Result Http.Error ())
 
@@ -365,16 +394,19 @@ update msg model =
 
         AddPressed ->
             ( { model | colorInput = "", nameInput = "" }
-            , addItem model.api
+            , addItem model.api.items
                 model.user.id
                 { color = model.colorInput
                 , name = model.nameInput
                 }
             )
 
+        WearPressed id ->
+            ( model, wearItem model.api.wear model.user.id id )
+
         DeletePressed id ->
             ( { model | showTooltip = Off }
-            , deleteItem model.api model.user.id id
+            , deleteItem model.api.items model.user.id id
             )
 
         EditPressed item ->
@@ -397,7 +429,7 @@ update msg model =
 
         SavePressed oldItem ->
             ( { model | showTooltip = Off }
-            , updateItem model.api
+            , updateItem model.api.items
                 model.user.id
                 { oldItem
                     | color = model.colorEditInput
@@ -409,6 +441,26 @@ update msg model =
             case result of
                 Ok item ->
                     ( { model | clothes = item :: model.clothes }, Cmd.none )
+
+                Err error ->
+                    ( model, Cmd.none )
+
+        ItemWorn id result ->
+            case result of
+                Ok lastWorn ->
+                    let
+                        clothes =
+                            List.map
+                                (\item ->
+                                    if item.id == id then
+                                        { item | lastWorn = lastWorn }
+
+                                    else
+                                        item
+                                )
+                                model.clothes
+                    in
+                    ( { model | clothes = clothes }, Cmd.none )
 
                 Err error ->
                     ( model, Cmd.none )
@@ -564,7 +616,11 @@ viewItems items editedColor editedName =
     table []
         { data = items
         , columns =
-            [ { header = text "Color"
+            [ { header = none
+              , width = fillPortion 1
+              , view = \{ id } -> viewField (viewWearButton id)
+              }
+            , { header = text "Color"
               , width = fillPortion 2
               , view = \{ color, state } -> viewField (viewProperty color state editedColor Color)
               }
@@ -705,6 +761,14 @@ viewTooltip state =
 
                 Save ->
                     tt colors.offWhite colors.cadmiumGreen "Save Item"
+
+
+viewWearButton : String -> Element Msg
+viewWearButton itemId =
+    Input.button [ Border.width 1, Border.color colors.black ]
+        { onPress = Just (WearPressed itemId)
+        , label = text "Wear it!"
+        }
 
 
 

@@ -11,12 +11,13 @@
       var init = {
         flags: {
           api: {
-            items: "<%= Routes.clothes_path(@conn, :index) %>"
+            items: "<%= Routes.clothes_path(@conn, :index) %>",
+            wear: "<%= Routes.clothes_path(@conn, :wear) %>"
           },
           user: {
             display_name: "",
-            id: "aec6dd57-4adb-46d3-ada8-714aa997c39e"
-            // id: "11890ede-19fe-4114-9c92-1294bd98e099"
+            // id: "aec6dd57-4adb-46d3-ada8-714aa997c39e"
+            id: "11890ede-19fe-4114-9c92-1294bd98e099"
           }
         }
       }

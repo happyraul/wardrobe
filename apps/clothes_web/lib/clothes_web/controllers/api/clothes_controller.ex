@@ -55,4 +55,21 @@ defmodule ClothesWeb.Api.ClothesController do
 
     text(conn, "deleted (maybe?)")
   end
+
+  def wear(conn, params) do
+    IO.inspect(params["data"])
+    conn = Plug.Conn.fetch_query_params(conn)
+    user_id = Map.fetch!(conn.params, "user")
+
+    item =
+      params["data"]
+      |> Map.new(fn {key, value} -> {String.to_atom(key), value} end)
+
+    wear =
+      user_id
+      |> Clothes.Cache.server_process()
+      |> Clothes.Server.wear_item(item.id)
+
+    render(conn, "wear.json", last_worn: wear.worn_at)
+  end
 end

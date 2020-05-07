@@ -22,6 +22,10 @@ defmodule Clothes.Server do
     GenServer.call(pid, {:clothes, name, color})
   end
 
+  def wear_item(pid, item_id) do
+    GenServer.call(pid, {:wear_item, item_id})
+  end
+
   def update_item(pid, %{} = new_item) do
     GenServer.cast(pid, {:update_item, new_item})
   end
@@ -77,5 +81,11 @@ defmodule Clothes.Server do
   def handle_call({:add_item, new_item}, _, user_id) do
     {:ok, item} = Clothes.add_item(Map.put(new_item, :user_id, user_id))
     {:reply, item.id, user_id, @expiry_idle_timeout}
+  end
+
+  @impl GenServer
+  def handle_call({:wear_item, item_id}, _, user_id) do
+    {:ok, wear } = Clothes.wear_item(item_id)
+    {:reply, wear, @expiry_idle_timeout}
   end
 end
