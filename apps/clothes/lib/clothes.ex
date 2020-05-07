@@ -42,7 +42,7 @@ defmodule Clothes do
     wears_select =
       from(
         wear in Clothes.Wear,
-        select: %Clothes.Wear{item_id: wear.item_id, worn_at: max(wear.worn_at)},
+        select: %{item_id: wear.item_id, worn_at: max(wear.worn_at), wear_count: count("*")},
         group_by: [:item_id]
       )
 
@@ -51,7 +51,8 @@ defmodule Clothes do
         item in Clothes.Item,
         left_join: wear in subquery(wears_select),
         on: item.id == wear.item_id,
-        select: %Clothes.Item{item | last_worn: wear.worn_at}
+        # maybe we can make this a map too, then we dont need virtual fields at all
+        select: %Clothes.Item{item | last_worn: wear.worn_at, wear_count: wear.wear_count}
       )
     )
   end
