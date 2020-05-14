@@ -12,6 +12,7 @@ import Element.Input as Input
 import FontAwesome.Duotone as Duotone
 import FontAwesome.Icon as Icon exposing (Icon)
 import FontAwesome.Styles as Icon
+import Html.Events
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -63,6 +64,7 @@ type alias ClothingItem =
     , color : String
     , name : String
     , lastWorn : String
+    , wearCount : Int
     , state : ItemState
     }
 
@@ -267,13 +269,18 @@ clothingItemsDecoder : Decode.Decoder (List ClothingItem)
 clothingItemsDecoder =
     Decode.field "data" <|
         Decode.list <|
-            Decode.map5 ClothingItem
+            Decode.map6 ClothingItem
                 (Decode.field "id" Decode.string)
                 (Decode.field "color" Decode.string)
                 (Decode.field "name" Decode.string)
                 (Decode.oneOf
                     [ Decode.field "last_worn" Decode.string
                     , Decode.succeed ""
+                    ]
+                )
+                (Decode.oneOf
+                    [ Decode.field "wear_count" Decode.int
+                    , Decode.succeed 0
                     ]
                 )
                 (Decode.succeed ModeView)
@@ -288,11 +295,12 @@ lastWornDecoder =
 itemDecoder : { color : String, name : String } -> Decode.Decoder ClothingItem
 itemDecoder item =
     Decode.field "data" <|
-        Decode.map5 ClothingItem
+        Decode.map6 ClothingItem
             (Decode.field "id" Decode.string)
             (Decode.succeed item.color)
             (Decode.succeed item.name)
             (Decode.succeed "")
+            (Decode.succeed 0)
             (Decode.succeed ModeView)
 
 
@@ -327,6 +335,7 @@ type Msg
     | UrlChanged Url.Url
     | ClothesLoaded (Result Http.Error (List ClothingItem))
     | TypedInput FormInput String
+    | KeyDown Int
     | MouseMoved ( Float, Float )
     | EnteredTooltip Tooltip
     | LeftTooltip
@@ -378,10 +387,27 @@ update msg model =
                 EditItem attribute ->
                     case attribute of
                         Color ->
-                            ( { model | colorEditInput = inputValue }, Cmd.none )
+                            ( { model | colorEditInput = inputValue }
+                            , Cmd.none
+                            )
 
                         Name ->
-                            ( { model | nameEditInput = inputValue }, Cmd.none )
+                            ( { model | nameEditInput = inputValue }
+                            , Cmd.none
+                            )
+
+        KeyDown key ->
+            if key == 13 && model.colorInput /= "" && model.nameInput /= "" then
+                ( { model | colorInput = "", nameInput = "" }
+                , addItem model.api.items
+                    model.user.id
+                    { color = model.colorInput
+                    , name = model.nameInput
+                    }
+                )
+
+            else
+                ( model, Cmd.none )
 
         MouseMoved pos ->
             ( { model | mousePosition = pos }, Cmd.none )
@@ -453,7 +479,10 @@ update msg model =
                             List.map
                                 (\item ->
                                     if item.id == id then
-                                        { item | lastWorn = lastWorn }
+                                        { item
+                                            | lastWorn = lastWorn
+                                            , wearCount = item.wearCount + 1
+                                        }
 
                                     else
                                         item
@@ -550,6 +579,12 @@ colors =
     }
 
 
+onKeyDown : (Int -> msg) -> Attribute msg
+onKeyDown tagger =
+    htmlAttribute <|
+        Html.Events.on "keydown" (Decode.map tagger Html.Events.keyCode)
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
@@ -591,13 +626,13 @@ viewForm colorInput nameInput =
             Just (Input.placeholder [] (text placeholder))
     in
     row []
-        [ Input.text []
+        [ Input.text [ onKeyDown KeyDown ]
             { onChange = TypedInput (NewItem Color)
             , text = colorInput
             , placeholder = viewPlaceholder "enter a color"
             , label = Input.labelAbove [] (text "color")
             }
-        , Input.text []
+        , Input.text [ onKeyDown KeyDown ]
             { onChange = TypedInput (NewItem Name)
             , text = nameInput
             , placeholder = viewPlaceholder "enter a name"
@@ -622,15 +657,39 @@ viewItems items editedColor editedName =
               }
             , { header = text "Color"
               , width = fillPortion 2
-              , view = \{ color, state } -> viewField (viewProperty color state editedColor Color)
+              , view =
+                    \{ color, state } ->
+                        viewField (viewProperty color state editedColor Color)
               }
             , { header = text "Name"
               , width = fillPortion 3
-              , view = \{ name, state } -> viewField (viewProperty name state editedName Name)
+              , view =
+                    \{ name, state } ->
+                        viewField (viewProperty name state editedName Name)
+              }
+            , { header = text "Worn"
+              , width = fillPortion 2
+              , view =
+                    \{ wearCount } ->
+                        let
+                            message : String
+                            message =
+                                if wearCount == 0 then
+                                    "Never worn"
+
+                                else if wearCount == 1 then
+                                    "Worn once"
+
+                                else
+                                    "Worn "
+                                        ++ String.fromInt wearCount
+                                        ++ " times"
+                        in
+                        viewField (text message)
               }
             , { header = text "Last Worn"
               , width = fillPortion 3
-              , view = \{ lastWorn, state } -> viewField (text lastWorn)
+              , view = \{ lastWorn } -> viewField (text lastWorn)
               }
             , { header = none
               , width = fillPortion 2
@@ -653,7 +712,7 @@ viewField child =
     column
         [ Border.widthEach { edges | top = 1 }
         , paddingEach { edges | top = 3, left = 3, bottom = 3 }
-        , height fill
+        , height (px 46)
         ]
         [ child ]
 

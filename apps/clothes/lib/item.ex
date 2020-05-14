@@ -28,7 +28,7 @@ defmodule Clothes.Item do
     field(:last_worn, :utc_datetime, virtual: true)
     field(:wear_count, :integer, virtual: true)
     belongs_to(:user, Clothes.User)
-    has_many(:wears, Clothes.Wear)
+    has_many(:wears, Clothes.Wear, on_delete: :delete_all)
     timestamps()
   end
 

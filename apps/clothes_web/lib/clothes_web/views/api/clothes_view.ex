@@ -18,7 +18,8 @@ defmodule ClothesWeb.Api.ClothesView do
       id: item.id,
       name: item.name,
       color: item.color,
-      last_worn: item.last_worn
+      last_worn: item.last_worn,
+      wear_count: item.wear_count
     }
   end
 end
