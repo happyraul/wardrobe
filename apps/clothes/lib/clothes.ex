@@ -32,9 +32,9 @@ defmodule Clothes do
   def find_user(id), do: @repo.get(Clothes.User, id)
 
   def insert_user(params) do
-    Clothes.User
-    |> struct(params)
-    |> @repo.insert
+    %Clothes.User{}
+    |> Clothes.User.changeset_with_password(params)
+    |> @repo.insert()
   end
 
   def all() do

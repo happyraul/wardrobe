@@ -31,7 +31,8 @@ defmodule Clothes.MixProject do
       # {:sibling_app_in_umbrella, in_umbrella: true}
       {:poolboy, "~> 1.5"},
       {:postgrex, "~> 0.15.3"},
-      {:ecto_sql, "~> 3.4.2"}
+      {:ecto_sql, "~> 3.4.2"},
+      {:bcrypt_elixir, "~> 2.2.0"}
     ]
   end
 end
